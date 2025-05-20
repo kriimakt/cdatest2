@@ -1,63 +1,72 @@
-name: Symfony 7 + Cypress E2E Tests
+name: CI & CD Symfony
 
 on:
-    push:
-        branches: [ main ]
-    pull_request:
-        branches: [ main ]
+  push:
+    branches: [ main ]      # déclenche sur push dans la branche main
+  pull_request:
+    branches: [ main ]      # ou sur PR vers main
+
 jobs:
-    Symfony-test:
-        runs-on: ubuntu-latest
-        # installation des services
-        services:
-            mysql:
-                image: mysql:8.0
-                env:
-                    MYSQL_ROOT_PASSWORD: root
-                    MYSQL_DATABASE: app
-                ports:
-                    - 3306:3306
-                options: >-
-                    --health-cmd="mysqladmin ping -h localhost"
-                    --health-interval=10s
-                    --health-timeout=5s
-                    --health-retries=5
-        steps:
-            # récupération du code du repository
-            - name: Checkout code
-              uses: actions/checkout@v4
-            
-            # configuration de PHP
-            - name: Set up PHP
-              uses: shivammathur/setup-php@v2
-              with:
-                php-version: "8.2"
-                extensions: mbstring, intl, pdo_mysql, sodium
-                tools: composer  
-            
-            # paramétrage de l'environnement de test
-            - name: Set up .env for CI
-              run: |
-                cp .env .env.test
-                echo "APP_ENV=test" >> .env
-                echo "APP_ENV=test" >> .env.test
-                echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/app" >> .env.test
-            
-            # installation des dépendances Symfony
-            - name: Install PHP dependencies
-              run: composer install --no-interaction --prefer-dist
-            
-            # migration de la base de données
-            - name: migration DB
-              run: |
-                php bin/console d:d:c
-                php bin/console d:m:m
-            
-            # démarrage du serveur Symfony
-            - name: Run Symfony local server
-              run: |
-                php -S 127.0.0.1:8001 -t public &
-            
-            # Cypress Actions
-            - name : Test Cypress
-              uses: cypress-io/github-action@v6
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP, extensions & composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, pdo_mysql, xml, zip
+          ini-values: post_max_size=256M, memory_limit=2G
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest --optimize-autoloader
+
+      - name: Lint PHP (optional)
+        run: |
+          composer exec phpstan analyse -l max
+          composer exec psalm
+
+      - name: Run tests
+        env:
+          APP_ENV: test
+        run: |
+          php bin/console doctrine:database:create --env=test --if-not-exists
+          php bin/console doctrine:migrations:migrate --env=test --no-interaction
+          ./vendor/bin/phpunit --testsuite=unit
+
+  deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup rsync for deployment
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Prepare SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Sync files to server
+        run: |
+          rsync -avz --delete \
+            --exclude '.github/' \
+            --exclude '.git/' \
+            --exclude 'var/cache/*' \
+            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/mon-projet
+
+      - name: Warm up cache & migrations on server
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            cd /var/www/mon-projet
+            composer install --no-dev --optimize-autoloader
+            php bin/console doctrine:migrations:migrate --no-interaction
+            php bin/console cache:clear --env=prod
+          EOF
