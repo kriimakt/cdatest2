@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello WeatherController!{% endblock %}
+
+{% block body %}
+<turbo-frame id="id_weather">
+    <h1>Afficher la météo</h1>
+    {{ form(form)}}
+
+    {% if weather is not null %}
+        {% if weather.cod == 200 %}
+            <h2>{{ weather.name }}</h2>
+            <h2>{{ weather.main.temp }} °</h2>
+            <img src="https://openweathermap.org/img/wn/{{ weather.weather[0].icon }}@2x.png" >
+        
+        {% elseif  weather.cod == 404 %}
+            <h2>La ville n'existe pas</h2>
+        {% elseif  weather.cod == 400 %}
+            <h2>Veuillez saisir la ville</h2>
+        {% endif %}
+    {% endif %}
+</turbo-frame>
+{% endblock %}

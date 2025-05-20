@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ajouter un compte{% endblock %}
+
+{% block body %}
+<turbo-frame id="register-id">
+    {{ form_start(form) }}
+    {{ form_row(form.firstname)}}
+    {{ form_row(form.lastname)}}
+    {{ form_row(form.email)}}
+    {{ form_label(form.password.first)}}
+    {{ form_widget(form.password.first)}}
+    <div class="text-red-500">{{ form_errors(form.password.first) }}</div>
+    {{ form_label(form.password.second)}}
+    {{ form_widget(form.password.second)}}
+    {{ form_rest(form) }}
+    {{ form_end(form) }}
+    {% include "component/_toast.html.twig" %}
+</turbo-frame>
+{% endblock %}
