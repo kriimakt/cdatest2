@@ -36,37 +36,3 @@ jobs:
           php bin/console doctrine:database:create --env=test --if-not-exists
           php bin/console doctrine:migrations:migrate --env=test --no-interaction
           ./vendor/bin/phpunit --testsuite=unit
-
-  deploy:
-    needs: build-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup rsync for deployment
-        run: sudo apt-get update && sudo apt-get install -y rsync
-
-      - name: Prepare SSH key
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Sync files to server
-        run: |
-          rsync -avz --delete \
-            --exclude '.github/' \
-            --exclude '.git/' \
-            --exclude 'var/cache/*' \
-            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/mon-projet
-
-      - name: Warm up cache & migrations on server
-        run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            cd /var/www/mon-projet
-            composer install --no-dev --optimize-autoloader
-            php bin/console doctrine:migrations:migrate --no-interaction
-            php bin/console cache:clear --env=prod
-          EOF
