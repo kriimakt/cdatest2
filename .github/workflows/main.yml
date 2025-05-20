@@ -2,9 +2,9 @@ name: CI & CD Symfony
 
 on:
   push:
-    branches: [ main ]      # déclenche sur push dans la branche main
+    branches: [ master ]      # déclenche sur push dans la branche main
   pull_request:
-    branches: [ main ]      # ou sur PR vers main
+    branches: [ master ]      # ou sur PR vers main
 
 jobs:
   build-test:
