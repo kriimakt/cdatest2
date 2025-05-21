@@ -26,7 +26,7 @@ jobs:
 
     env:
       APP_ENV: test
-      DATABASE_URL: mysql://root:root@127.0.0.1:3306/app
+      DATABASE_URL: mysql://root:root@mysql:3306/app
 
     steps:
       - name: Checkout code
@@ -47,15 +47,7 @@ jobs:
           echo "DATABASE_URL=${DATABASE_URL}" >> .env.test
 
       - name: Wait for MySQL
-        run: |
-          for i in {1..10}; do
-            if mysqladmin ping -h 127.0.0.1 -uroot -proot --silent; then
-              echo "MySQL is ready"
-              break
-            fi
-            echo "Waiting for MySQL..."
-            sleep 5
-          done
+        run: sleep 30
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist
