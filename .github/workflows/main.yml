@@ -11,19 +11,19 @@ jobs:
   Symfony-test:
     runs-on: [self-hosted]
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: app
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+    #services:
+      #mysql:
+       # image: mysql:8.0
+        #env:
+         # MYSQL_ROOT_PASSWORD: root
+          #MYSQL_DATABASE: app
+        #ports:
+         # - 3306:3306
+        #options: >-
+         # --health-cmd="mysqladmin ping -h 127.0.0.1"
+          #--health-interval=10s
+          #--health-timeout=5s
+          #--health-retries=5
 
     env:
       APP_ENV: test
@@ -32,6 +32,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Run MySQL container
+        run: |
+          docker run --name mysql-ci \
+            -e MYSQL_ROOT_PASSWORD=root \
+            -e MYSQL_DATABASE=app \
+            -p 3306:3306 \
+            -d mysql:8.0
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
