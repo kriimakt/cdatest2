@@ -78,3 +78,4 @@ jobs:
           start: echo "Symfony déjà démarré"
           wait-on: 'http://127.0.0.1:8001'
           wait-on-timeout: 60
+
