@@ -1,7 +1,7 @@
 name: Symfony 7 + Cypress E2E Tests
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # permet de le lancer manuellement
   push:
     branches: [ master ]
   pull_request:
@@ -9,72 +9,66 @@ on:
 
 jobs:
   Symfony-test:
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: app
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
-      # 🧾 Récupération du code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🐘 Lancement du conteneur MySQL
-      - name: Run MySQL container
-        run: |
-          docker run --name mysql-ci \
-            -e MYSQL_ROOT_PASSWORD=root \
-            -e MYSQL_DATABASE=app \
-            -p 3306:3306 \
-            -d mysql:8.0
+      - name: Install netcat
+        run: sudo apt-get update && sudo apt-get install -y netcat
 
-      # 🕒 Attente que MySQL soit prêt
-      - name: Wait for MySQL to be ready
+      - name: Wait for MySQL
         run: |
-          for i in {1..20}; do
-            if docker exec mysql-ci mysqladmin ping -h "127.0.0.1" --silent; then
-              echo "MySQL is up!"
-              break
-            fi
+          for i in {1..15}; do
+            nc -z 127.0.0.1 3306 && echo "MySQL is up" && break
             echo "Waiting for MySQL..."
-            sleep 3
+            sleep 2
           done
 
-      # 🧰 Setup PHP
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.2"
           extensions: mbstring, intl, pdo_mysql, sodium
-          tools: composer  
+          tools: composer
 
-      # 🛠️ Création des fichiers d'environnement
       - name: Set up .env for CI
         run: |
           cp .env .env.test
           echo "APP_ENV=test" >> .env
           echo "APP_ENV=test" >> .env.test
-          echo "DATABASE_URL=mysql://root:root@host.docker.internal:3306/app" >> .env.test
+          echo "DATABASE_URL=mysql://root:root@127.0.0.1:3306/app" >> .env.test
 
-      # 📦 Installation des dépendances PHP
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist
 
-      # 🧱 Création + migration base de données
-      - name: Run database migrations
+      - name: Run DB migrations
         run: |
           php bin/console doctrine:database:create --if-not-exists
           php bin/console doctrine:migrations:migrate --no-interaction
 
-      # 🚀 Lancement du serveur Symfony en fond
       - name: Start Symfony server
         run: |
-          php -S 127.0.0.1:8001 -t public &
+          php -S 127.0.0.1:8000 -t public &
 
-      # 🧪 Tests Cypress
       - name: Run Cypress tests
         uses: cypress-io/github-action@v6
         with:
-          start: echo "Symfony already running"
-
-      # 🧹 Nettoyage du conteneur MySQL
-      - name: Cleanup MySQL container
-        if: always()
-        run: docker rm -f mysql-ci
+          start: php -S 127.0.0.1:8000 -t public
+          wait-on: 'http://127.0.0.1:8000'
+          wait-on-timeout: 60
